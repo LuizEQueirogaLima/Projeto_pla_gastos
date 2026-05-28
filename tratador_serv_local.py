@@ -28,7 +28,8 @@ def Criar_estutura_d_dados():
                     valor REAL NOT NULL,
                     parcela TEXT DEFAULT '-',
                     modalidade TEXT NOT NULL,
-                    banco TEXT NOT NULL
+                    banco TEXT NOT NULL,
+                    UNIQUE (data, descricao, valor, banco)
                 )
             ''')
         print(" Tabela base criada e conexão fechada com sucesso!")
@@ -40,11 +41,27 @@ def Criar_estutura_d_dados():
 def Inserindo_em_arquivo(dados_tratados):
     nome_banco = 'banco_gastos.db'
     try:
+        dados_tratados = dados_tratados.drop_duplicates()
+        
         with sqlite3.connect(nome_banco) as conexao:
-            dados_tratados.to_sql('tabela_gastos', conexao, if_exists='append', index=False)
-            print(f"Sucesso! {len(dados_tratados)} linhas foram tratadas e enviadas ao banco de dados.")
+            cursor = conexao.cursor()
+            dados_tratados.to_sql('tabela_temporaria', conexao, if_exists='replace', index=False)
+            
+            cursor.execute('''
+                INSERT OR IGNORE INTO tabela_gastos (
+                    feito_por, data, descricao, valor, parcela, modalidade, banco)
+                SELECT feito_por, data, descricao, valor, parcela, modalidade, banco 
+                FROM tabela_temporaria
+            ''')
+            
+            linhas_inseridas = cursor.rowcount
+            
+            cursor.execute('DROP TABLE tabela_temporaria')
+            
+            print(f" Inserção Inteligente: {linhas_inseridas} transações inéditas salvas no banco. (Duplicatas ignoradas).")
+            
     except Exception as e:
-        print(f"Erro ao inserir dados {e}")       
+        print(f" Erro ao realizar a transação no banco de dados: {e}")    
 
 # Isso permite testar o arquivo sozinho, se precisar
 #if __name__ == "__main__":

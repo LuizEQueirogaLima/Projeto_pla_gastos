@@ -42,27 +42,32 @@ def trat_movimentacoes_a():
 
                     print(dados_tratados.head())
                     tratador_serv_local.Inserindo_em_arquivo(dados_tratados)
+                    
                 elif extrato_de_entrada.startswith('NU_'):
+                    
                     print("Arquivo configurado transações de pix e débito\n")
                     
                     gerais_nao_tratados = pd.read_csv(extrato_de_entrada)
                     dados_tratados = gerais_nao_tratados
                     dados_tratados = gerais_nao_tratados.copy()
                     
-                    
+                    # Inserindo colunas para a formatação correta da tabela
                     dados_tratados['feito_por'] = 'Não Informado'
-                    dados_tratados['banco'] = 'Nubank'
                     dados_tratados['parcela'] = '-'
                     dados_tratados['modalidade'] = '-'
-                    
+                    dados_tratados['banco'] = 'Nubank'
+
                     dados_tratados['Data'] = pd.to_datetime(dados_tratados['Data'], format="%d/%m/%Y")
-                    dados_tratados['Data'] = dados_tratados['Data'].dt.strftime('%Y-%m-%d') 
+                    dados_tratados['Data'] = dados_tratados['Data'].dt.strftime('%Y-%m-%d')
                     
+                    # tratamento de dados para a coluna Modalidade
+                    dados_tratados.loc[dados_tratados['Descrição'].str.contains('débito|debito', case=False, na=False), 'modalidade'] = 'Débito'
+                    dados_tratados.loc[dados_tratados['Descrição'].str.contains('transferência|ted|doc', case=False, na=False), 'modalidade'] = 'Transferência'
                     dados_tratados.loc[dados_tratados['Descrição'].str.contains('pix', case=False, na=False), 'modalidade'] = 'PIX'
                     
-                    dados_tratados.loc[dados_tratados['Descrição'].str.contains('débito|debito', case=False, na=False), 'modalidade'] = 'Débito'
-                    
-                    dados_tratados.loc[dados_tratados['Descrição'].str.contains('transferência|ted|doc', case=False, na=False), 'modalidade'] = 'Transferência'
+                    # identificando nomes das pessoas dentro das transações financeiras s
+                    dados_tratados.loc[dados_tratados['Descrição'].str.contains('pessoa 1 ', case=False, na=False), 'feito_por'] = 'pessoa 1'
+                    dados_tratados.loc[dados_tratados['Descrição'].str.contains('pessoa 2', case=False, na=False), 'feito_por'] = 'pessoa 2'
                     
                     
                     dados_tratados = dados_tratados.rename(columns={'Descrição':'descricao','Data': 'data','Valor': 'valor'})
