@@ -1,169 +1,166 @@
-
 import pandas as pd
 import os
 import tratador_serv_local
 
-
-def trat_movimentacoes_a():
-
-    extrato_de_entrada = 'Arquivo_teste.csv' 
-    
-    # Entrada Nubank
-    if extrato_de_entrada.startswith(('Nubank', 'NU')):
+def tratar_nubank(arquivo):
+    # Tratamento e Limpeza do extrato Nubank
+    if arquivo.startswith('Nubank_'):
+        # Tratamentos para extrato no geral
+        df_bruto = pd.read_csv(arquivo, encoding='utf-8', sep=',', decimal=',')
+        dados_tratados = df_bruto.copy()
         
-        try:
-                tratador_serv_local.Criar_estutura_d_dados() 
-
-                if extrato_de_entrada.startswith('Nubank_'):
-                    print("Arquivo configurado em crédito\n")
-                    
-                    dados_nao_tratados = pd.read_csv(extrato_de_entrada, encoding='utf-8', sep=',', decimal=',')
-                    
-                    dados_tratados = dados_nao_tratados
-                    dados_tratados = dados_nao_tratados.copy()
-                    
-                    dados_tratados['feito_por'] = 'Não Informado'
-                    dados_tratados['banco'] = 'Nubank' 
-                    dados_tratados['modalidade'] = 'Crédito'
-                    
-                    dados_tratados['date'] = pd.to_datetime(dados_tratados['date'], format="%Y-%m-%d")
-                    dados_tratados['date'] = dados_tratados['date'].dt.strftime('%Y-%m-%d')
-                    
-                    dados_tratados['parcela'] = dados_tratados['title'].str.extract(r'(\d+/\d+)')
-                    dados_tratados['parcela'] = dados_tratados['parcela'].fillna('-')
-                    
-
-                    dados_tratados['title'] = dados_tratados['title'].str.replace(r'\s*-\s*Parcela \d+/\d+', '', regex=True).str.strip() 
-
-                    dados_tratados = dados_tratados.rename(columns={'date': 'data','title': 'descricao', 'amount': 'valor'})
-                    
-                    dados_tratados = dados_tratados[['feito_por','data','descricao','valor','parcela','modalidade','banco']]
-
-                    print(dados_tratados.info())
-
-                    print(dados_tratados.head())
-                    tratador_serv_local.Inserindo_em_arquivo(dados_tratados)
-                    
-                elif extrato_de_entrada.startswith('NU_'):
-                    
-                    print("Arquivo configurado transações de pix e débito\n")
-                    
-                    gerais_nao_tratados = pd.read_csv(extrato_de_entrada, encoding='utf-8', sep=',', decimal=',')
-                    dados_tratados = gerais_nao_tratados
-                    dados_tratados = gerais_nao_tratados.copy()
-                    
-                    # Inserindo colunas para a formatação correta da tabela
-                    dados_tratados['feito_por'] = 'Não Informado'
-                    dados_tratados['parcela'] = '-'
-                    dados_tratados['modalidade'] = '-'
-                    dados_tratados['banco'] = 'Nubank'
-
-                    dados_tratados['Data'] = pd.to_datetime(dados_tratados['Data'], format="%d/%m/%Y")
-                    dados_tratados['Data'] = dados_tratados['Data'].dt.strftime('%Y-%m-%d')
-                    
-                    # tratamento de dados para a coluna Modalidade
-                    dados_tratados.loc[dados_tratados['Descrição'].str.contains('débito|debito', case=False, na=False), 'modalidade'] = 'Débito'
-                    dados_tratados.loc[dados_tratados['Descrição'].str.contains('transferência|ted|doc', case=False, na=False), 'modalidade'] = 'Transferência'
-                    dados_tratados.loc[dados_tratados['Descrição'].str.contains('pix', case=False, na=False), 'modalidade'] = 'PIX'
-                    
-                    # identificando nomes das pessoas dentro das transações financeiras s
-                    dados_tratados.loc[dados_tratados['Descrição'].str.contains('pessoa 1 ', case=False, na=False), 'feito_por'] = 'pessoa 1'
-                    dados_tratados.loc[dados_tratados['Descrição'].str.contains('pessoa 2', case=False, na=False), 'feito_por'] = 'pessoa 2'
-                    
-                    
-                    dados_tratados = dados_tratados.rename(columns={'Descrição':'descricao','Data': 'data','Valor': 'valor'})
-                    dados_tratados = dados_tratados[['feito_por','data','descricao','valor','parcela','modalidade','banco']]
-                    
-                    print(dados_tratados.info())
-
-                    print(dados_tratados.head())
-                    tratador_serv_local.Inserindo_em_arquivo(dados_tratados)
-                    
-    
-                    
-                    
-        except FileNotFoundError:
-            print(f"Arquivos em questão não foram encontrados dentro da pasta do projeto..")
-            
-    # Entrada Banco do Brasil
-    if  extrato_de_entrada.startswith('Extrato'): 
+        dados_tratados['feito_por'] = 'Nome de usuario'
+        dados_tratados['banco'] = 'Nubank'
+        dados_tratados['modalidade'] = 'Crédito'
         
-        print("Tratando arquivo referente a sua Conta Corrente do Banco do Brasil...\n")
+        dados_tratados['date'] = pd.to_datetime(dados_tratados['date'], format="%Y-%m-%d")
+        dados_tratados['date'] = dados_tratados['date'].dt.strftime('%Y-%m-%d')
+        dados_tratados['parcela'] = dados_tratados['title'].str.extract(r'(\d+/\d+)').fillna('-')
+        dados_tratados['title'] = dados_tratados['title'].str.replace(r'\s*-\s*Parcela \d+/\d+', '', regex=True).str.strip() 
         
-        df_bb_bruto = pd.read_csv(extrato_de_entrada, encoding='utf-8', sep=',', decimal=',')
-        dados_tratados = df_bb_bruto.copy()
+        dados_tratados = dados_tratados.rename(columns={'date': 'data','title': 'descricao', 'amount': 'valor'})
+        return dados_tratados[['feito_por','data','descricao','valor','parcela','modalidade','banco']]
         
-        dados_tratados.columns = dados_tratados.columns.str.strip()
+    elif arquivo.startswith('NU_'):
+        # Tratamentos para dados de cartão de crédito
+        df_bruto = pd.read_csv(arquivo, encoding='utf-8', sep=',', decimal=',')
+        dados_tratados = df_bruto.copy()
         
-        coluna_bugada = dados_tratados.columns[1] 
-        dados_tratados = dados_tratados.rename(columns={coluna_bugada: 'Lançamento'}) 
+        dados_tratados['feito_por'] = 'Nome de usuario'
+        dados_tratados['banco'] = 'Nubank'
+        dados_tratados['modalidade'] = '-'
+        dados_tratados['parcela'] = '-'
         
-        print("COLUNAS ENCONTRADAS!:", dados_tratados.columns.tolist())
-        
-        # Otimização de dados/ Encontrando especificidades em transações
-        dados_tratados = dados_tratados[dados_tratados['Data'] != '00/00/0000']
-        # ~ Invertendo lógica de verificação booleana para a entrada correta de informações.
-        dados_tratados = dados_tratados[~dados_tratados['Lançamento'].str.contains('Saldo', case=False, na=False)]
-        dados_tratados = dados_tratados[~dados_tratados['Lançamento'].str.contains('Estorno', case=False, na=False)]
-        mask_recorrentes = dados_tratados['Lançamento'].str.contains('Tarifa', case=False, na=False)
-        dados_tratados = dados_tratados[~((mask_recorrentes) & (dados_tratados.duplicated(subset=['Lançamento'])))]
-        
-        # Padronização do banco de dados SQlite
         dados_tratados['Data'] = pd.to_datetime(dados_tratados['Data'], format="%d/%m/%Y")
         dados_tratados['Data'] = dados_tratados['Data'].dt.strftime('%Y-%m-%d')
         
-        dados_tratados['feito_por'] = 'Não definido' 
-        dados_tratados['banco'] = 'Banco do Brasil'
-        dados_tratados['parcela'] = '-'
-        dados_tratados['modalidade'] = '-'
+        # Identificando e tratando nomes especificos
+        dados_tratados.loc[dados_tratados['Descrição'].str.contains('débito|debito', case=False, na=False), 'modalidade'] = 'Débito'
+        dados_tratados.loc[dados_tratados['Descrição'].str.contains('transferência|ted|doc', case=False, na=False), 'modalidade'] = 'Transferência'
+        dados_tratados.loc[dados_tratados['Descrição'].str.contains('pix', case=False, na=False), 'modalidade'] = 'PIX'
+        dados_tratados.loc[dados_tratados['Descrição'].str.contains('Luiz', case=False, na=False), 'feito_por'] = 'Luiz'
+        dados_tratados.loc[dados_tratados['Descrição'].str.contains('Stefanny', case=False, na=False), 'feito_por'] = 'Stéfanny'
         
-        # Descobrindo a modalidade
-        dados_tratados.loc[dados_tratados['Lançamento'].str.contains('Pix', case=False, na=False), 'modalidade'] = 'PIX'
-        dados_tratados.loc[dados_tratados['Lançamento'].str.contains('Tarifa|FIES', case=False, na=False), 'modalidade'] = 'Débito Automático'
-        
-        # dados_tratados = dados_tratados[~dados_tratados['Lançamento'].str.contains(r'S\s*A\s*L\s*D\s*O', case=False, na=False, regex=True)]
-        dados_tratados = dados_tratados.rename(columns={
-            'Data': 'data', 'Lançamento': 'descricao', 'Valor': 'valor'})
-        
-        dados_tratados = dados_tratados[['feito_por', 'data', 'descricao', 'valor', 'parcela', 'modalidade', 'banco']]
+        dados_tratados = dados_tratados.rename(columns={'Descrição':'descricao','Data': 'data','Valor': 'valor'})
+        return dados_tratados[['feito_por','data','descricao','valor','parcela','modalidade','banco']]
 
-        print(dados_tratados.head(10))
-        
-        tratador_serv_local.Inserindo_em_arquivo(dados_tratados)
-    # Entrada mercado Pago 
-    if extrato_de_entrada.startswith('account_statement'):
-        print(" Tratando arquivo de Conta do Mercado Pago...\n")
+def tratar_inter(arquivo):
+    # Tratamento de dados do Banco Inter
+    df_bruto = pd.read_csv(arquivo, sep=';', decimal=',', thousands='.', skiprows=5, encoding='utf-8')
+    dados_tratados = df_bruto.copy()
+    # Filtrando colunas para evitar quebra de dados no Pandas
+    colu_data, colu_historico, colu_desc, colu_valor = dados_tratados.columns[0:4]
+    
+    dados_tratados[colu_data] = dados_tratados[colu_data].astype(str).str.strip()
+    dados_tratados[colu_data] = pd.to_datetime(dados_tratados[colu_data], format="%d/%m/%Y")
+    dados_tratados[colu_data] = dados_tratados[colu_data].dt.strftime('%Y-%m-%d')
+    
+    dados_tratados['feito_por'] = 'Nome de usuario'
+    dados_tratados['banco'] = 'Inter'
+    dados_tratados['parcela'] = '-'
+    dados_tratados['modalidade'] = '-'
+    
+    dados_tratados.loc[dados_tratados[colu_historico].str.contains('Pix', case=False, na=False), 'modalidade'] = 'PIX'
+    dados_tratados.loc[dados_tratados[colu_historico].str.contains('débito|debito', case=False, na=False), 'modalidade'] = 'Débito'
+    dados_tratados.loc[dados_tratados[colu_historico].str.contains('transferência', case=False, na=False), 'modalidade'] = 'Transferência'
+    
+    dados_tratados = dados_tratados.rename(columns={colu_data:'data', colu_desc:'descricao', colu_valor:'valor'})
+    return dados_tratados[['feito_por','data','descricao','valor','parcela','modalidade','banco']]
 
-        # skiprows=3 ignora as primeiras linhas (o arquivo do mercado Pago gera um pré-relatório)
-        df_mp_bruto = pd.read_csv(extrato_de_entrada, sep=';', decimal=',',thousands='.', skiprows=3, encoding='utf-8')
-        dados_tratados = df_mp_bruto.copy()
+def tratar_bb(arquivo):
+    # Tratamento de dados do banco do Brasil
+    
+    df_bruto = pd.read_csv(arquivo, encoding='utf-8', sep=',', decimal=',')
+    dados_tratados = df_bruto.copy()
+    
+    dados_tratados.columns = dados_tratados.columns.str.strip()
+    # Atribuindo a variável a info de uma coluna com nome quebrado
+    coluna_bugada = dados_tratados.columns[1] 
+    dados_tratados = dados_tratados.rename(columns={coluna_bugada: 'Lançamento'})
+    
+    dados_tratados = dados_tratados[dados_tratados['Data'] != '00/00/0000']
+    dados_tratados = dados_tratados[~dados_tratados['Lançamento'].str.contains('Saldo|Estorno', case=False, na=False, regex=True)]
+    
+    dado_repetido = dados_tratados['Lançamento'].str.contains('FIES|Tarifa', case=False, na=False)
+    dados_tratados = dados_tratados[~((dado_repetido) & (dados_tratados.duplicated(subset=['Lançamento'])))]
+    
+    dados_tratados['Data'] = pd.to_datetime(dados_tratados['Data'], format="%d/%m/%Y")
+    dados_tratados['Data'] = dados_tratados['Data'].dt.strftime('%Y-%m-%d')
+    
+    dados_tratados['feito_por'] = 'Nome de usuario'
+    dados_tratados['banco'] = 'Banco do Brasil'
+    dados_tratados['parcela'] = '-'
+    dados_tratados['modalidade'] = '-'
+    
+    dados_tratados.loc[dados_tratados['Lançamento'].str.contains('Pix', case=False, na=False), 'modalidade'] = 'PIX'
+    dados_tratados.loc[dados_tratados['Lançamento'].str.contains('Tarifa', case=False, na=False), 'modalidade'] = 'Débito Automático'
+    
+    dados_tratados = dados_tratados[~dados_tratados['Lançamento'].str.contains(r'S\s*A\s*L\s*D\s*O', case=False, na=False, regex=True)]
+    dados_tratados = dados_tratados.rename(columns={'Data': 'data', 'Lançamento': 'descricao', 'Valor': 'valor'})
+    
+    return dados_tratados[['feito_por', 'data', 'descricao', 'valor', 'parcela', 'modalidade', 'banco']]
+
+def tratar_mercado_pago(arquivo):
+    # Tratamento de dados Mercado Pago
+    print("Tratando arquivo de Conta do Mercado Pago...\n")
+    df_bruto = pd.read_csv(arquivo, sep=';', decimal=',', thousands='.', skiprows=3, encoding='utf-8')
+    dados_tratados = df_bruto.copy()
+    
+    dados_tratados.columns = dados_tratados.columns.str.strip()
+    dados_tratados['RELEASE_DATE'] = pd.to_datetime(dados_tratados['RELEASE_DATE'], format="%d-%m-%Y")
+    dados_tratados['RELEASE_DATE'] = dados_tratados['RELEASE_DATE'].dt.strftime('%Y-%m-%d')
+    
+    dados_tratados['feito_por'] = 'Nome de usuario'
+    dados_tratados['banco'] = 'Mercado Pago'
+    dados_tratados['parcela'] = '-'
+    dados_tratados['modalidade'] = '-'
+    
+    dados_tratados = dados_tratados.rename(columns={'RELEASE_DATE': 'data', 'TRANSACTION_TYPE': 'descricao','TRANSACTION_NET_AMOUNT': 'valor'})
+    
+    dados_tratados.loc[dados_tratados['descricao'].str.contains('Pix', case=False, na=False), 'modalidade'] = 'PIX'
+    dados_tratados.loc[dados_tratados['descricao'].str.contains('Rendimentos', case=False, na=False), 'modalidade'] = 'Rendimento'
+    
+    return dados_tratados[['feito_por', 'data', 'descricao', 'valor', 'parcela', 'modalidade', 'banco']]
+
+# Função que redireciona ao banco certo
+def processar_extrato():    
+    
+    banco_especificado = 'Extrato conta corrente - 032026.csv'
+    
+    # Identifica caso o arquivo não exista na página
+    if not os.path.exists(banco_especificado):
+        print(f"Erro: O arquivo '{banco_especificado}' não foi encontrado.")
+        return
+
+    # Garante a redundância do programa, criando o arquivo .db caso ele não exista
+    tratador_serv_local.Criar_estutura_d_dados()
+    
+    # A variável matriz_limpa vai capturar a formatação final dos dados 
+    matriz_limpa = None
+
+    # Cascata programada de acordo com os tipos de extratos encontrados em cada banco
+    
+    if banco_especificado.startswith(('Nubank', 'NU')): 
+        matriz_limpa = tratar_nubank(banco_especificado)    
+    elif banco_especificado.endswith('-CSV.csv') or '-CSV' in banco_especificado:
+        matriz_limpa = tratar_inter(banco_especificado)
+    elif banco_especificado.startswith('Extrato'):
+        matriz_limpa = tratar_bb(banco_especificado)
+    elif banco_especificado.startswith('account_statement'):
+        matriz_limpa = tratar_mercado_pago(banco_especificado)
         
-        dados_tratados.columns = dados_tratados.columns.str.strip()
-        
-        # formatação de Data
-        dados_tratados['RELEASE_DATE'] = pd.to_datetime(dados_tratados['RELEASE_DATE'], format="%d-%m-%Y")
-        dados_tratados['RELEASE_DATE'] = dados_tratados['RELEASE_DATE'].dt.strftime('%Y-%m-%d')
-        
-        #Colunas obrigatórias
-        dados_tratados['feito_por'] = 'Não definido'
-        dados_tratados['banco'] = 'Mercado Pago'
-        dados_tratados['parcela'] = '-'
-        dados_tratados['modalidade'] = '-'
-        
-        # Renomeando colunas
-        dados_tratados = dados_tratados.rename(columns={'RELEASE_DATE': 'data', 'TRANSACTION_TYPE': 'descricao','TRANSACTION_NET_AMOUNT': 'valor'})
-        
-        # Organizando categorias
-        dados_tratados.loc[dados_tratados['descricao'].str.contains('Pix', case=False, na=False), 'modalidade'] = 'PIX'
-        dados_tratados.loc[dados_tratados['descricao'].str.contains('Rendimentos', case=False, na=False), 'modalidade'] = 'Rendimento'
-        
-        # Reordenando colunas
-        dados_tratados = dados_tratados[['feito_por', 'data', 'descricao', 'valor', 'parcela', 'modalidade', 'banco']]
-        
-        # Exibe no terminal para auditoria
-        print("Tabela do Mercado Pago padronizada:")
-        print(dados_tratados.head(15))                  
-        tratador_serv_local.Inserindo_em_arquivo(dados_tratados)
-        
+    else:
+        print("Formato de arquivo não reconhecido pelo sistema.")
+        return
+
+    # Os dados tratados são mandados para o arquivo .db aqui
+    if matriz_limpa is not None and not matriz_limpa.empty:
+        print(matriz_limpa.head())
+        tratador_serv_local.Inserindo_em_arquivo(matriz_limpa)
+        print("\nProcessamento e salvamento concluídos!")
+
+
+# Simulação de como o seu Menu chamará esta inteligência amanhã:
 if __name__ == "__main__":
-    trat_movimentacoes_a()
+    processar_extrato()
+
