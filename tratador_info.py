@@ -4,12 +4,14 @@ import tratador_serv_local
 
 def tratar_nubank(arquivo):
     # Tratamento e Limpeza do extrato Nubank
-    if arquivo.startswith('Nubank_'):
+    nome = os.path.basename(arquivo)
+    
+    if nome.startswith('Nubank_'):
         # Tratamentos para extrato no geral
         df_bruto = pd.read_csv(arquivo, encoding='utf-8', sep=',', decimal=',')
         dados_tratados = df_bruto.copy()
         
-        dados_tratados['feito_por'] = 'Nome de usuario'
+        dados_tratados['feito_por'] = 'Luiz'
         dados_tratados['banco'] = 'Nubank'
         dados_tratados['modalidade'] = 'Crédito'
         
@@ -21,12 +23,12 @@ def tratar_nubank(arquivo):
         dados_tratados = dados_tratados.rename(columns={'date': 'data','title': 'descricao', 'amount': 'valor'})
         return dados_tratados[['feito_por','data','descricao','valor','parcela','modalidade','banco']]
         
-    elif arquivo.startswith('NU_'):
+    elif nome.startswith('NU_'):
         # Tratamentos para dados de cartão de crédito
         df_bruto = pd.read_csv(arquivo, encoding='utf-8', sep=',', decimal=',')
         dados_tratados = df_bruto.copy()
         
-        dados_tratados['feito_por'] = 'Nome de usuario'
+        dados_tratados['feito_por'] = 'Luiz'
         dados_tratados['banco'] = 'Nubank'
         dados_tratados['modalidade'] = '-'
         dados_tratados['parcela'] = '-'
@@ -55,7 +57,7 @@ def tratar_inter(arquivo):
     dados_tratados[colu_data] = pd.to_datetime(dados_tratados[colu_data], format="%d/%m/%Y")
     dados_tratados[colu_data] = dados_tratados[colu_data].dt.strftime('%Y-%m-%d')
     
-    dados_tratados['feito_por'] = 'Nome de usuario'
+    dados_tratados['feito_por'] = 'Luiz'
     dados_tratados['banco'] = 'Inter'
     dados_tratados['parcela'] = '-'
     dados_tratados['modalidade'] = '-'
@@ -87,13 +89,13 @@ def tratar_bb(arquivo):
     dados_tratados['Data'] = pd.to_datetime(dados_tratados['Data'], format="%d/%m/%Y")
     dados_tratados['Data'] = dados_tratados['Data'].dt.strftime('%Y-%m-%d')
     
-    dados_tratados['feito_por'] = 'Nome de usuario'
+    dados_tratados['feito_por'] = 'Luiz'
     dados_tratados['banco'] = 'Banco do Brasil'
     dados_tratados['parcela'] = '-'
     dados_tratados['modalidade'] = '-'
     
     dados_tratados.loc[dados_tratados['Lançamento'].str.contains('Pix', case=False, na=False), 'modalidade'] = 'PIX'
-    dados_tratados.loc[dados_tratados['Lançamento'].str.contains('Tarifa', case=False, na=False), 'modalidade'] = 'Débito Automático'
+    dados_tratados.loc[dados_tratados['Lançamento'].str.contains('Tarifa|FIES', case=False, na=False), 'modalidade'] = 'Débito Automático'
     
     dados_tratados = dados_tratados[~dados_tratados['Lançamento'].str.contains(r'S\s*A\s*L\s*D\s*O', case=False, na=False, regex=True)]
     dados_tratados = dados_tratados.rename(columns={'Data': 'data', 'Lançamento': 'descricao', 'Valor': 'valor'})
@@ -110,7 +112,7 @@ def tratar_mercado_pago(arquivo):
     dados_tratados['RELEASE_DATE'] = pd.to_datetime(dados_tratados['RELEASE_DATE'], format="%d-%m-%Y")
     dados_tratados['RELEASE_DATE'] = dados_tratados['RELEASE_DATE'].dt.strftime('%Y-%m-%d')
     
-    dados_tratados['feito_por'] = 'Nome de usuario'
+    dados_tratados['feito_por'] = 'Luiz'
     dados_tratados['banco'] = 'Mercado Pago'
     dados_tratados['parcela'] = '-'
     dados_tratados['modalidade'] = '-'
@@ -122,45 +124,43 @@ def tratar_mercado_pago(arquivo):
     
     return dados_tratados[['feito_por', 'data', 'descricao', 'valor', 'parcela', 'modalidade', 'banco']]
 
-# Função que redireciona ao banco certo
-def processar_extrato():    
-    
-    banco_especificado = 'Extrato conta corrente - 032026.csv'
-    
+def processar_extrato(caminho_arquivo):
     # Identifica caso o arquivo não exista na página
-    if not os.path.exists(banco_especificado):
-        print(f"Erro: O arquivo '{banco_especificado}' não foi encontrado.")
-        return
+    if not os.path.exists(caminho_arquivo):
+        print(f"Erro: O arquivo  não foi encontrado.")
+        return False
 
     # Garante a redundância do programa, criando o arquivo .db caso ele não exista
     tratador_serv_local.Criar_estutura_d_dados()
     
-    # A variável matriz_limpa vai capturar a formatação final dos dados 
+    # A variável matriz_limpa vai capturar o 'return' de quem processar o arquivo
     matriz_limpa = None
 
+    nome_arquivo = os.path.basename(caminho_arquivo)
     # Cascata programada de acordo com os tipos de extratos encontrados em cada banco
     
-    if banco_especificado.startswith(('Nubank', 'NU')): 
-        matriz_limpa = tratar_nubank(banco_especificado)    
-    elif banco_especificado.endswith('-CSV.csv') or '-CSV' in banco_especificado:
-        matriz_limpa = tratar_inter(banco_especificado)
-    elif banco_especificado.startswith('Extrato'):
-        matriz_limpa = tratar_bb(banco_especificado)
-    elif banco_especificado.startswith('account_statement'):
-        matriz_limpa = tratar_mercado_pago(banco_especificado)
-        
+    # Nubank
+    if nome_arquivo.startswith(('Nubank', 'NU')): 
+        matriz_limpa = tratar_nubank(caminho_arquivo)
+    # Inter    
+    elif nome_arquivo.endswith('-CSV.csv') or '-CSV' in caminho_arquivo:
+        matriz_limpa = tratar_inter(caminho_arquivo)
+    # Banco do Brasil
+    elif nome_arquivo.startswith('Extrato'):
+        matriz_limpa = tratar_bb(caminho_arquivo)
+    # Mercado Pago    
+    elif nome_arquivo.startswith('account_statement'):
+        matriz_limpa = tratar_mercado_pago(caminho_arquivo)
     else:
         print("Formato de arquivo não reconhecido pelo sistema.")
-        return
-
-    # Os dados tratados são mandados para o arquivo .db aqui
+        return False
+    # Ponto de saída 
     if matriz_limpa is not None and not matriz_limpa.empty:
-        print(matriz_limpa.head())
-        tratador_serv_local.Inserindo_em_arquivo(matriz_limpa)
-        print("\nProcessamento e salvamento concluídos!")
+            tratador_serv_local.Inserindo_em_arquivo(matriz_limpa)
+            return True 
+        
+    return False
 
-
-# Simulação de como o seu Menu chamará esta inteligência amanhã:
 if __name__ == "__main__":
     processar_extrato()
 
